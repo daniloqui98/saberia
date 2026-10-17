@@ -6,6 +6,12 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserModule } from './user/user.module.js';
 import { AuthModule } from './auth/auth.module.js';
+import { FacultadModule } from './facultad/facultad.module.js';
+import { RolModule } from './rol/rol.module.js';
+import { PeriodoAcademicoModule } from './periodo-academico/periodo-academico.module.js';
+import { ModuloModule } from './modulo/modulo.module.js';
+import { CatalogoInsigniaModule } from './catalogo-insignia/catalogo-insignia.module.js';
+import { CatalogoRecompensaModule } from './catalogo-recompensa/catalogo-recompensa.module.js';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { ExampleController } from './example/example.controller.js';
@@ -50,6 +56,12 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     }),
     UserModule,
     AuthModule,
+    FacultadModule,
+    RolModule,
+    PeriodoAcademicoModule,
+    ModuloModule,
+    CatalogoInsigniaModule,
+    CatalogoRecompensaModule,
   ],
   
   controllers: [AppController, ExampleController],
