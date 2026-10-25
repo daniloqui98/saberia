@@ -23,27 +23,30 @@ export class AuthService {
   }
 
   async login(loginDto: LoginDto): Promise<AuthResponse> {
-    const { email, password } = loginDto;
+    const { correo, contrasena } = loginDto;
 
     const user: User | null =
-      await this.userService.findOneByEmail(email);
+      await this.userService.findOneByCorreo(correo);
 
     if (!user) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
     const isPasswordValid: boolean = await bcrypt.compare(
-      password,
-      user.password,
+      contrasena,
+      user.contrasena_hash,
     );
 
     if (!isPasswordValid) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
-    if (!user.isActive) {
+    if (!user.estado) {
       throw new UnauthorizedException('Usuario inactivo');
     }
+
+    // Registrar la fecha del inicio de sesión (ultimo_acceso)
+    await this.userService.registrarAcceso(user.id_usuario);
 
     return await this.buildAuthResponse(user);
   }
@@ -60,7 +63,7 @@ export class AuthService {
     const user: User | null =
       await this.userService.findById(payload.sub);
 
-    if (!user || !user.isActive) {
+    if (!user || !user.estado) {
       throw new UnauthorizedException('Token inválido');
     }
 
@@ -69,9 +72,9 @@ export class AuthService {
 
   private async generateToken(user: User): Promise<string> {
     const payload: JwtPayload = {
-      sub: user.id,
-      email: user.email,
-      role: user.role,
+      sub: user.id_usuario,
+      correo: user.correo,
+      rol: user.rol.nombre,
     };
 
     return await this.jwtService.signAsync(payload);
@@ -84,10 +87,11 @@ export class AuthService {
 
     return {
       user: {
-        id: user.id,
-        email: user.email,
-        fullName: user.fullName,
-        role: user.role,
+        id_usuario: user.id_usuario,
+        correo: user.correo,
+        nombres: user.nombres,
+        apellidos: user.apellidos,
+        rol: user.rol.nombre,
       },
       token,
     };

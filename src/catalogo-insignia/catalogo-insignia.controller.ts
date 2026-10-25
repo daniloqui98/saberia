@@ -18,7 +18,7 @@ import { Roles } from '../auth/decorators/roles.decorator.js';
 
 @Controller('catalogo-insignias')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('admin')
+@Roles('ADMINISTRADOR')
 export class CatalogoInsigniaController {
   constructor(private readonly insigniaService: CatalogoInsigniaService) {}
 

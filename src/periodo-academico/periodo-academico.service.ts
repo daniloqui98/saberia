@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Not, Repository } from 'typeorm';
+import { Not, QueryFailedError, Repository } from 'typeorm';
 
 import { PeriodoAcademico } from './entities/periodo-academico.entity.js';
 import { CreatePeriodoAcademicoDto } from './dto/create-periodo-academico.dto.js';
@@ -110,7 +110,17 @@ export class PeriodoAcademicoService {
   async remove(id: number): Promise<void> {
     const periodo = await this.findOne(id);
 
-    await this.periodoRepository.remove(periodo);
+    try {
+      await this.periodoRepository.remove(periodo);
+    } catch (error) {
+      // 1451 = ER_ROW_IS_REFERENCED_2: hay grupos que apuntan a este periodo
+      if (error instanceof QueryFailedError && error.driverError?.errno === 1451) {
+        throw new ConflictException(
+          'No se puede eliminar el periodo porque tiene registros asociados',
+        );
+      }
+      throw error;
+    }
   }
 
   /**

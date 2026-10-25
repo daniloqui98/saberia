@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 
 import { Facultad } from './entities/facultad.entity.js';
 import { CreateFacultadDto } from './dto/create-facultad.dto.js';
@@ -90,6 +90,16 @@ export class FacultadService {
   async remove(id: number): Promise<void> {
     const facultad = await this.findOne(id);
 
-    await this.facultadRepository.remove(facultad);
+    try {
+      await this.facultadRepository.remove(facultad);
+    } catch (error) {
+      // 1451 = ER_ROW_IS_REFERENCED_2: hay programas que apuntan a esta facultad
+      if (error instanceof QueryFailedError && error.driverError?.errno === 1451) {
+        throw new ConflictException(
+          'No se puede eliminar la facultad porque tiene programas asociados',
+        );
+      }
+      throw error;
+    }
   }
 }

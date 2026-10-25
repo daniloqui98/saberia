@@ -18,7 +18,7 @@ import { Roles } from '../auth/decorators/roles.decorator.js';
 
 @Controller('periodos-academicos')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('admin')
+@Roles('ADMINISTRADOR')
 export class PeriodoAcademicoController {
   constructor(private readonly periodoService: PeriodoAcademicoService) {}
 

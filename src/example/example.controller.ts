@@ -22,7 +22,7 @@ export class ExampleController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin')
+  @Roles('ADMINISTRADOR')
   @Get('admin')
   adminRoute(@GetUser() user: User): ExampleResponse {
     return {

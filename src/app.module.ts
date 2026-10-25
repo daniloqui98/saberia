@@ -12,6 +12,12 @@ import { PeriodoAcademicoModule } from './periodo-academico/periodo-academico.mo
 import { ModuloModule } from './modulo/modulo.module.js';
 import { CatalogoInsigniaModule } from './catalogo-insignia/catalogo-insignia.module.js';
 import { CatalogoRecompensaModule } from './catalogo-recompensa/catalogo-recompensa.module.js';
+import { ProgramaModule } from './programa/programa.module.js';
+import { CompetenciaModule } from './competencia/competencia.module.js';
+import { LogAccionModule } from './log-accion/log-accion.module.js';
+import { PerfilDocenteModule } from './perfil-docente/perfil-docente.module.js';
+import { PerfilEstudianteModule } from './perfil-estudiante/perfil-estudiante.module.js';
+import { GrupoModule } from './grupo/grupo.module.js';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { ExampleController } from './example/example.controller.js';
@@ -62,6 +68,12 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     ModuloModule,
     CatalogoInsigniaModule,
     CatalogoRecompensaModule,
+    ProgramaModule,
+    CompetenciaModule,
+    LogAccionModule,
+    PerfilDocenteModule,
+    PerfilEstudianteModule,
+    GrupoModule,
   ],
   
   controllers: [AppController, ExampleController],

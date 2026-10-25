@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 
 import { Rol } from './entities/rol.entity.js';
 import { CreateRolDto } from './dto/create-rol.dto.js';
@@ -57,6 +57,23 @@ export class RolService {
   }
 
   /**
+   * Obtener un rol por su nombre (ej: 'ESTUDIANTE')
+   */
+  async findByNombre(nombre: string): Promise<Rol> {
+    const rol = await this.rolRepository.findOne({
+      where: { nombre },
+    });
+
+    if (!rol) {
+      throw new NotFoundException(
+        `El rol ${nombre} no existe, debe crearse primero en /roles`,
+      );
+    }
+
+    return rol;
+  }
+
+  /**
    * Actualizar un rol
    */
   async update(id: number, updateRolDto: UpdateRolDto): Promise<Rol> {
@@ -84,6 +101,16 @@ export class RolService {
   async remove(id: number): Promise<void> {
     const rol = await this.findOne(id);
 
-    await this.rolRepository.remove(rol);
+    try {
+      await this.rolRepository.remove(rol);
+    } catch (error) {
+      // 1451 = ER_ROW_IS_REFERENCED_2: hay usuarios que tienen este rol
+      if (error instanceof QueryFailedError && error.driverError?.errno === 1451) {
+        throw new ConflictException(
+          'No se puede eliminar el rol porque hay usuarios con este rol',
+        );
+      }
+      throw error;
+    }
   }
 }

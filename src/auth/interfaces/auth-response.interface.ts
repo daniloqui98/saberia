@@ -1,9 +1,10 @@
 export interface AuthResponse {
   user: {
-    id: number;
-    email: string;
-    fullName: string;
-    role: string;
+    id_usuario: number;
+    correo: string;
+    nombres: string;
+    apellidos: string;
+    rol: string;
   };
   token: string;
 }

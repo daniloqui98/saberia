@@ -18,7 +18,7 @@ import { Roles } from '../auth/decorators/roles.decorator.js';
 
 @Controller('modulos')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('admin')
+@Roles('ADMINISTRADOR')
 export class ModuloController {
   constructor(private readonly moduloService: ModuloService) {}
 

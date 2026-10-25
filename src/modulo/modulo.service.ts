@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 
 import { Modulo } from './entities/modulo.entity.js';
 import { CreateModuloDto } from './dto/create-modulo.dto.js';
@@ -84,6 +84,16 @@ export class ModuloService {
   async remove(id: number): Promise<void> {
     const modulo = await this.findOne(id);
 
-    await this.moduloRepository.remove(modulo);
+    try {
+      await this.moduloRepository.remove(modulo);
+    } catch (error) {
+      // 1451 = ER_ROW_IS_REFERENCED_2: hay competencias que apuntan a este módulo
+      if (error instanceof QueryFailedError && error.driverError?.errno === 1451) {
+        throw new ConflictException(
+          'No se puede eliminar el módulo porque tiene registros asociados',
+        );
+      }
+      throw error;
+    }
   }
 }

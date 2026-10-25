@@ -34,8 +34,9 @@ export class RolesGuard implements CanActivate {
       throw new UnauthorizedException('Debes iniciar sesión');
     }
 
-    // El usuario no tiene el rol requerido
-    if (!requiredRoles.includes(user.role)) {
+    // El rol del usuario (tbl_rol) debe estar entre los roles requeridos
+    // La estrategia JWT carga user.rol desde la base de datos en cada petición
+    if (!user.rol || !requiredRoles.includes(user.rol.nombre)) {
       throw new ForbiddenException(
         'No tienes permisos para este recurso',
       );

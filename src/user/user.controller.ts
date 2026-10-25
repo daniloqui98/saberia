@@ -18,7 +18,7 @@ import { Roles } from '../auth/decorators/roles.decorator.js';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('admin')
+@Roles('ADMINISTRADOR')
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
@@ -35,7 +35,7 @@ export class UserController {
    * GET /users
    * Obtener todos los usuarios
    */
-  @Roles('moderador', "admin")
+  @Roles('ADMINISTRADOR', 'DOCENTE')
   @Get()
   findAll() {
     return this.userService.findAll();
