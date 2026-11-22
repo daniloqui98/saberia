@@ -268,46 +268,42 @@ erDiagram
     }
 
     %% ===== Relaciones =====
-    FACULTAD ||--o{ PROGRAMA : ofrece
-    PROGRAMA |o--o{ USUARIO : agrupa
-    ROL ||--o{ USUARIO : asigna
-    USUARIO ||--o{ LOG_ACCIONES : registra
-    USUARIO ||--o| PERFIL_DOCENTE : es
-    USUARIO ||--o| PERFIL_ESTUDIANTE : es
-    PERFIL_DOCENTE ||--o{ GRUPO : dirige
-    PROGRAMA ||--o{ GRUPO : tiene
-    PERIODO_ACADEMICO ||--o{ GRUPO : "se dicta"
-    GRUPO |o--o{ PERFIL_ESTUDIANTE : matricula
-
-    MODULO ||--o{ COMPETENCIA : tiene
-    COMPETENCIA ||--o{ AFIRMACION : tiene
-    AFIRMACION ||--o{ EVIDENCIA : tiene
-    EVIDENCIA ||--o{ PREGUNTA : evalua
-    USUARIO |o--o{ PREGUNTA : redacta
-    PREGUNTA ||--o{ OPCION : tiene
-    COMPETENCIA ||--o{ RECURSO_APOYO : apoya
-
-    USUARIO ||--o{ SIMULACRO : crea
-    MODULO |o--o{ SIMULACRO : define
-    SIMULACRO ||--o{ SIM_PREGUNTA : contiene
-    PREGUNTA ||--o{ SIM_PREGUNTA : "se usa en"
-    GRUPO ||--o{ ASIGNACION_SIMULACRO : recibe
-    SIMULACRO ||--o{ ASIGNACION_SIMULACRO : "se asigna"
-    PERFIL_ESTUDIANTE ||--o{ SESION_SIM : presenta
-    SIMULACRO ||--o{ SESION_SIM : genera
-    ASIGNACION_SIMULACRO |o--o{ SESION_SIM : origina
-    SESION_SIM ||--o{ RESPUESTA_SIM : incluye
-    SIM_PREGUNTA ||--o{ RESPUESTA_SIM : responde
-    OPCION |o--o{ RESPUESTA_SIM : selecciona
-
-    ASIGNACION_SIMULACRO ||--o| REPORTE_GRUPO : resume
-    SESION_SIM ||--o{ DESEMPENO_COMPETENCIA : produce
-    COMPETENCIA ||--o{ DESEMPENO_COMPETENCIA : mide
-    DESEMPENO_COMPETENCIA ||--o{ RETROALIMENTACION : genera
-    RECURSO_APOYO |o--o{ RETROALIMENTACION : sugiere
-
-    PERFIL_ESTUDIANTE ||--o{ TRANSACCION_PUNTOS : acumula
-    PERFIL_ESTUDIANTE ||--o{ INSIGNIA_ESTUDIANTE : obtiene
-    CATALOGO_INSIGNIA ||--o{ INSIGNIA_ESTUDIANTE : otorga
-    PERFIL_ESTUDIANTE ||--o{ CANJE_RECOMPENSA : canjea
-    CATALOGO_RECOMPENSA ||--o{ CANJE_RECOMPENSA : ofrece
+    FACULTAD ||--o{ PROGRAMA : "ofrece (1:N)"
+    PROGRAMA |o--o{ USUARIO : "agrupa (1:N)"
+    ROL ||--o{ USUARIO : "asigna (1:N)"
+    USUARIO ||--o{ LOG_ACCIONES : "registra (1:N)"
+    USUARIO ||--o| PERFIL_DOCENTE : "es (1:1)"
+    USUARIO ||--o| PERFIL_ESTUDIANTE : "es (1:1)"
+    PERFIL_DOCENTE ||--o{ GRUPO : "dirige (1:N)"
+    PROGRAMA ||--o{ GRUPO : "tiene (1:N)"
+    PERIODO_ACADEMICO ||--o{ GRUPO : "se dicta (1:N)"
+    GRUPO |o--o{ PERFIL_ESTUDIANTE : "matricula (1:N)"
+    MODULO ||--o{ COMPETENCIA : "tiene (1:N)"
+    COMPETENCIA ||--o{ AFIRMACION : "tiene (1:N)"
+    AFIRMACION ||--o{ EVIDENCIA : "tiene (1:N)"
+    EVIDENCIA ||--o{ PREGUNTA : "evalua (1:N)"
+    USUARIO |o--o{ PREGUNTA : "redacta (1:N)"
+    PREGUNTA ||--o{ OPCION : "tiene (1:N)"
+    COMPETENCIA ||--o{ RECURSO_APOYO : "apoya (1:N)"
+    USUARIO ||--o{ SIMULACRO : "crea (1:N)"
+    MODULO |o--o{ SIMULACRO : "define (1:N)"
+    SIMULACRO ||--o{ SIM_PREGUNTA : "contiene (1:N)"
+    PREGUNTA ||--o{ SIM_PREGUNTA : "se usa en (1:N)"
+    GRUPO ||--o{ ASIGNACION_SIMULACRO : "recibe (1:N)"
+    SIMULACRO ||--o{ ASIGNACION_SIMULACRO : "se asigna (1:N)"
+    PERFIL_ESTUDIANTE ||--o{ SESION_SIM : "presenta (1:N)"
+    SIMULACRO ||--o{ SESION_SIM : "genera (1:N)"
+    ASIGNACION_SIMULACRO |o--o{ SESION_SIM : "origina (1:N)"
+    SESION_SIM ||--o{ RESPUESTA_SIM : "incluye (1:N)"
+    SIM_PREGUNTA ||--o{ RESPUESTA_SIM : "responde (1:N)"
+    OPCION |o--o{ RESPUESTA_SIM : "selecciona (1:N)"
+    ASIGNACION_SIMULACRO ||--o| REPORTE_GRUPO : "resume (1:1)"
+    SESION_SIM ||--o{ DESEMPENO_COMPETENCIA : "produce (1:N)"
+    COMPETENCIA ||--o{ DESEMPENO_COMPETENCIA : "mide (1:N)"
+    DESEMPENO_COMPETENCIA ||--o{ RETROALIMENTACION : "genera (1:N)"
+    RECURSO_APOYO |o--o{ RETROALIMENTACION : "sugiere (1:N)"
+    PERFIL_ESTUDIANTE ||--o{ TRANSACCION_PUNTOS : "acumula (1:N)"
+    PERFIL_ESTUDIANTE ||--o{ INSIGNIA_ESTUDIANTE : "obtiene (1:N)"
+    CATALOGO_INSIGNIA ||--o{ INSIGNIA_ESTUDIANTE : "otorga (1:N)"
+    PERFIL_ESTUDIANTE ||--o{ CANJE_RECOMPENSA : "canjea (1:N)"
+    CATALOGO_RECOMPENSA ||--o{ CANJE_RECOMPENSA : "ofrece (1:N)"

@@ -286,50 +286,48 @@ erDiagram
     }
 
     %% ===== Relaciones =====
-    FACULTAD ||--o{ PROGRAMA : ofrece
-    PROGRAMA |o--o{ USUARIO : agrupa
-    ROL ||--o{ USUARIO : asigna
-    USUARIO ||--o{ LOG_ACCIONES : registra
-    USUARIO ||--o| PERFIL_DOCENTE : es
-    USUARIO ||--o| PERFIL_ESTUDIANTE : es
-    PERFIL_DOCENTE ||--o{ GRUPO : dirige
-    PROGRAMA ||--o{ GRUPO : tiene
-    PERIODO_ACADEMICO ||--o{ GRUPO : "se dicta"
-    GRUPO |o--o{ PERFIL_ESTUDIANTE : matricula
-
-    MODULO ||--o{ COMPETENCIA : tiene
-    COMPETENCIA ||--o{ AFIRMACION : tiene
-    AFIRMACION ||--o{ EVIDENCIA : tiene
-    EVIDENCIA ||--o{ PREGUNTA : evalua
-    USUARIO |o--o{ PREGUNTA : redacta
-    PREGUNTA ||--o{ OPCION : tiene
-    COMPETENCIA ||--o{ RECURSO_APOYO : apoya
-
-    USUARIO ||--o{ SIMULACRO : crea
-    MODULO |o--o{ SIMULACRO : define
-    SIMULACRO ||--o{ SIM_PREGUNTA : contiene
-    PREGUNTA ||--o{ SIM_PREGUNTA : "se usa en"
-    GRUPO ||--o{ ASIGNACION_SIMULACRO : recibe
-    SIMULACRO ||--o{ ASIGNACION_SIMULACRO : "se asigna"
-    PERFIL_ESTUDIANTE ||--o{ SESION_SIM : presenta
-    SIMULACRO ||--o{ SESION_SIM : genera
-    ASIGNACION_SIMULACRO |o--o{ SESION_SIM : origina
-    SESION_SIM ||--o{ RESPUESTA_SIM : incluye
-    SIM_PREGUNTA ||--o{ RESPUESTA_SIM : responde
-    OPCION |o--o{ RESPUESTA_SIM : selecciona
-
-    ASIGNACION_SIMULACRO ||--o| REPORTE_GRUPO : resume
-    SESION_SIM ||--o{ DESEMPENO_COMPETENCIA : produce
-    COMPETENCIA ||--o{ DESEMPENO_COMPETENCIA : mide
-    DESEMPENO_COMPETENCIA ||--o{ RETROALIMENTACION : genera
-    RECURSO_APOYO |o--o{ RETROALIMENTACION : sugiere
-
-    PERFIL_ESTUDIANTE ||--o{ TRANSACCION_PUNTOS : acumula
-    PERFIL_ESTUDIANTE ||--o{ INSIGNIA_ESTUDIANTE : obtiene
-    CATALOGO_INSIGNIA ||--o{ INSIGNIA_ESTUDIANTE : otorga
-    PERFIL_ESTUDIANTE ||--o{ CANJE_RECOMPENSA : canjea
-    CATALOGO_RECOMPENSA ||--o{ CANJE_RECOMPENSA : ofrece
+    FACULTAD ||--o{ PROGRAMA : "ofrece (1:N)"
+    PROGRAMA |o--o{ USUARIO : "agrupa (1:N)"
+    ROL ||--o{ USUARIO : "asigna (1:N)"
+    USUARIO ||--o{ LOG_ACCIONES : "registra (1:N)"
+    USUARIO ||--o| PERFIL_DOCENTE : "es (1:1)"
+    USUARIO ||--o| PERFIL_ESTUDIANTE : "es (1:1)"
+    PERFIL_DOCENTE ||--o{ GRUPO : "dirige (1:N)"
+    PROGRAMA ||--o{ GRUPO : "tiene (1:N)"
+    PERIODO_ACADEMICO ||--o{ GRUPO : "se dicta (1:N)"
+    GRUPO |o--o{ PERFIL_ESTUDIANTE : "matricula (1:N)"
+    MODULO ||--o{ COMPETENCIA : "tiene (1:N)"
+    COMPETENCIA ||--o{ AFIRMACION : "tiene (1:N)"
+    AFIRMACION ||--o{ EVIDENCIA : "tiene (1:N)"
+    EVIDENCIA ||--o{ PREGUNTA : "evalua (1:N)"
+    USUARIO |o--o{ PREGUNTA : "redacta (1:N)"
+    PREGUNTA ||--o{ OPCION : "tiene (1:N)"
+    COMPETENCIA ||--o{ RECURSO_APOYO : "apoya (1:N)"
+    USUARIO ||--o{ SIMULACRO : "crea (1:N)"
+    MODULO |o--o{ SIMULACRO : "define (1:N)"
+    SIMULACRO ||--o{ SIM_PREGUNTA : "contiene (1:N)"
+    PREGUNTA ||--o{ SIM_PREGUNTA : "se usa en (1:N)"
+    GRUPO ||--o{ ASIGNACION_SIMULACRO : "recibe (1:N)"
+    SIMULACRO ||--o{ ASIGNACION_SIMULACRO : "se asigna (1:N)"
+    PERFIL_ESTUDIANTE ||--o{ SESION_SIM : "presenta (1:N)"
+    SIMULACRO ||--o{ SESION_SIM : "genera (1:N)"
+    ASIGNACION_SIMULACRO |o--o{ SESION_SIM : "origina (1:N)"
+    SESION_SIM ||--o{ RESPUESTA_SIM : "incluye (1:N)"
+    SIM_PREGUNTA ||--o{ RESPUESTA_SIM : "responde (1:N)"
+    OPCION |o--o{ RESPUESTA_SIM : "selecciona (1:N)"
+    ASIGNACION_SIMULACRO ||--o| REPORTE_GRUPO : "resume (1:1)"
+    SESION_SIM ||--o{ DESEMPENO_COMPETENCIA : "produce (1:N)"
+    COMPETENCIA ||--o{ DESEMPENO_COMPETENCIA : "mide (1:N)"
+    DESEMPENO_COMPETENCIA ||--o{ RETROALIMENTACION : "genera (1:N)"
+    RECURSO_APOYO |o--o{ RETROALIMENTACION : "sugiere (1:N)"
+    PERFIL_ESTUDIANTE ||--o{ TRANSACCION_PUNTOS : "acumula (1:N)"
+    PERFIL_ESTUDIANTE ||--o{ INSIGNIA_ESTUDIANTE : "obtiene (1:N)"
+    CATALOGO_INSIGNIA ||--o{ INSIGNIA_ESTUDIANTE : "otorga (1:N)"
+    PERFIL_ESTUDIANTE ||--o{ CANJE_RECOMPENSA : "canjea (1:N)"
+    CATALOGO_RECOMPENSA ||--o{ CANJE_RECOMPENSA : "ofrece (1:N)"
 </pre>
+<h3>Cardinalidad</h3>
+<ul><li>1:1 = uno a uno, 1:N = uno a muchos (escrito en cada relacion).</li><li>Relaciones N:M resueltas con una tabla intermedia (se ven como dos 1:N):</li><li>SIMULACRO N:M PREGUNTA, a traves de SIM_PREGUNTA.</li><li>GRUPO N:M SIMULACRO, a traves de ASIGNACION_SIMULACRO.</li><li>PERFIL_ESTUDIANTE N:M CATALOGO_INSIGNIA, a traves de INSIGNIA_ESTUDIANTE.</li><li>PERFIL_ESTUDIANTE N:M CATALOGO_RECOMPENSA, a traves de CANJE_RECOMPENSA.</li><li>PERFIL_ESTUDIANTE N:M SIMULACRO, a traves de SESION_SIM.</li></ul>
 <h3>Cambios frente a la version 2</h3>
 <ul><li>Se elimino USUARIO_ROL: cada usuario tiene un solo rol (id_rol en USUARIO).</li><li>Se elimino GRUPO_ESTUDIANTE: cada estudiante esta en un solo grupo (id_grupo en PERFIL_ESTUDIANTE).</li><li>nivel_global de PERFIL_ESTUDIANTE pasa a DECIMAL(5,2) (rango 0.00 - 300.00).</li><li>nivel_logro de DESEMPENO_COMPETENCIA: Nivel 1 a Nivel 4 (Ingles: -A1 a B2).</li></ul>
 <p style="font-size:12px">PK = clave primaria, FK = clave foranea, UK = unica. "derivado" = lo calcula el sistema.</p>
