@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 
 import { CatalogoInsignia } from './entities/catalogo-insignia.entity.js';
 import { CreateCatalogoInsigniaDto } from './dto/create-catalogo-insignia.dto.js';
@@ -94,6 +94,16 @@ export class CatalogoInsigniaService {
   async remove(id: number): Promise<void> {
     const insignia = await this.findOne(id);
 
-    await this.insigniaRepository.remove(insignia);
+    try {
+      await this.insigniaRepository.remove(insignia);
+    } catch (error) {
+      // 1451 = ER_ROW_IS_REFERENCED_2: la insignia ya fue otorgada a estudiantes
+      if (error instanceof QueryFailedError && error.driverError?.errno === 1451) {
+        throw new ConflictException(
+          'No se puede eliminar la insignia porque ya fue otorgada a estudiantes',
+        );
+      }
+      throw error;
+    }
   }
 }

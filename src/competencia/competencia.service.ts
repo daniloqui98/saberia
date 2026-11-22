@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 
 import { Competencia } from './entities/competencia.entity.js';
 import { CreateCompetenciaDto } from './dto/create-competencia.dto.js';
@@ -117,6 +117,16 @@ export class CompetenciaService {
   async remove(id: number): Promise<void> {
     const competencia = await this.findOne(id);
 
-    await this.competenciaRepository.remove(competencia);
+    try {
+      await this.competenciaRepository.remove(competencia);
+    } catch (error) {
+      // 1451 = ER_ROW_IS_REFERENCED_2: hay afirmaciones u otros registros que apuntan a esta competencia
+      if (error instanceof QueryFailedError && error.driverError?.errno === 1451) {
+        throw new ConflictException(
+          'No se puede eliminar la competencia porque tiene registros asociados',
+        );
+      }
+      throw error;
+    }
   }
 }

@@ -1,6 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 
 import { CatalogoRecompensa } from './entities/catalogo-recompensa.entity.js';
 import { CreateCatalogoRecompensaDto } from './dto/create-catalogo-recompensa.dto.js';
@@ -62,11 +66,33 @@ export class CatalogoRecompensaService {
   }
 
   /**
+   * Sumar o restar unidades al stock (lo usa Canje de recompensa)
+   * cantidad = -1 al canjear, +1 al anular un canje
+   */
+  async ajustarStock(id: number, cantidad: number): Promise<void> {
+    await this.recompensaRepository.increment(
+      { id_item: id },
+      'stock',
+      cantidad,
+    );
+  }
+
+  /**
    * Eliminar una recompensa
    */
   async remove(id: number): Promise<void> {
     const recompensa = await this.findOne(id);
 
-    await this.recompensaRepository.remove(recompensa);
+    try {
+      await this.recompensaRepository.remove(recompensa);
+    } catch (error) {
+      // 1451 = ER_ROW_IS_REFERENCED_2: la recompensa ya fue canjeada
+      if (error instanceof QueryFailedError && error.driverError?.errno === 1451) {
+        throw new ConflictException(
+          'No se puede eliminar la recompensa porque ya tiene canjes; desactívala con activo: false',
+        );
+      }
+      throw error;
+    }
   }
 }

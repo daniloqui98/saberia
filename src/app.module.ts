@@ -18,6 +18,22 @@ import { LogAccionModule } from './log-accion/log-accion.module.js';
 import { PerfilDocenteModule } from './perfil-docente/perfil-docente.module.js';
 import { PerfilEstudianteModule } from './perfil-estudiante/perfil-estudiante.module.js';
 import { GrupoModule } from './grupo/grupo.module.js';
+import { AfirmacionModule } from './afirmacion/afirmacion.module.js';
+import { EvidenciaModule } from './evidencia/evidencia.module.js';
+import { PreguntaModule } from './pregunta/pregunta.module.js';
+import { OpcionModule } from './opcion/opcion.module.js';
+import { SimulacroModule } from './simulacro/simulacro.module.js';
+import { SimPreguntaModule } from './sim-pregunta/sim-pregunta.module.js';
+import { AsignacionSimulacroModule } from './asignacion-simulacro/asignacion-simulacro.module.js';
+import { SesionSimModule } from './sesion-sim/sesion-sim.module.js';
+import { RespuestaSimModule } from './respuesta-sim/respuesta-sim.module.js';
+import { DesempenoCompetenciaModule } from './desempeno-competencia/desempeno-competencia.module.js';
+import { RecursoApoyoModule } from './recurso-apoyo/recurso-apoyo.module.js';
+import { RetroalimentacionModule } from './retroalimentacion/retroalimentacion.module.js';
+import { ReporteGrupoModule } from './reporte-grupo/reporte-grupo.module.js';
+import { TransaccionPuntosModule } from './transaccion-puntos/transaccion-puntos.module.js';
+import { InsigniaEstudianteModule } from './insignia-estudiante/insignia-estudiante.module.js';
+import { CanjeRecompensaModule } from './canje-recompensa/canje-recompensa.module.js';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { ExampleController } from './example/example.controller.js';
@@ -74,6 +90,22 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     PerfilDocenteModule,
     PerfilEstudianteModule,
     GrupoModule,
+    AfirmacionModule,
+    EvidenciaModule,
+    PreguntaModule,
+    OpcionModule,
+    SimulacroModule,
+    SimPreguntaModule,
+    AsignacionSimulacroModule,
+    SesionSimModule,
+    RespuestaSimModule,
+    DesempenoCompetenciaModule,
+    RecursoApoyoModule,
+    RetroalimentacionModule,
+    ReporteGrupoModule,
+    TransaccionPuntosModule,
+    InsigniaEstudianteModule,
+    CanjeRecompensaModule,
   ],
   
   controllers: [AppController, ExampleController],

@@ -3,8 +3,8 @@ import { IsInt, IsNumber, IsOptional, Max, Min } from 'class-validator';
 import { CreatePerfilEstudianteDto } from './create-perfil-estudiante.dto.js';
 
 // id_usuario NO se puede cambiar (relación 1:1)
-// Los atributos derivados se pueden ajustar a mano por ahora; más adelante
-// los calculará el sistema (simulacros, transacciones de puntos, rachas)
+// puntos_totales NO se envía: lo calcula el sistema con tbl_transaccion_puntos
+// Los demás atributos derivados (nivel, rachas) se ajustan a mano por ahora
 export class UpdatePerfilEstudianteDto extends PartialType(
   OmitType(CreatePerfilEstudianteDto, ['id_usuario'] as const),
 ) {
@@ -17,12 +17,6 @@ export class UpdatePerfilEstudianteDto extends PartialType(
   @Max(300, { message: 'El nivel_global debe estar entre 0 y 300' })
   @IsOptional()
   nivel_global?: number;
-
-  // (*) Puntos totales, entero >= 0
-  @IsInt({ message: 'Los puntos_totales deben ser un número entero' })
-  @Min(0, { message: 'Los puntos_totales no pueden ser negativos' })
-  @IsOptional()
-  puntos_totales?: number;
 
   // (*) Racha actual, entero >= 0
   @IsInt({ message: 'La racha_actual debe ser un número entero' })
