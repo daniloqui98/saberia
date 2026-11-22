@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 
 import { CanjeRecompensa } from './entities/canje-recompensa.entity.js';
 import { CreateCanjeRecompensaDto } from './dto/create-canje-recompensa.dto.js';
@@ -25,11 +25,17 @@ export class CanjeRecompensaService {
     private readonly catalogoService: CatalogoRecompensaService,
     // Servicio de puntos para descontar (o devolver) los puntos
     private readonly transaccionService: TransaccionPuntosService,
+    // Conexión para abrir transacciones
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
    * Canjear una recompensa
    * usuarioActual: un estudiante solo puede canjear con su propio perfil
+   *
+   * Todo ocurre en UNA transacción: descontar stock, guardar el canje y
+   * descontar los puntos. Si algo falla (por ejemplo, saldo insuficiente),
+   * se deshace todo y el stock vuelve a quedar como estaba
    */
   async create(
     createDto: CreateCanjeRecompensaDto,
@@ -54,41 +60,48 @@ export class CanjeRecompensaService {
       );
     }
 
-    if (item.stock <= 0) {
-      throw new BadRequestException(`La recompensa "${item.nombre}" está agotada`);
-    }
-
-    const saldo = await this.transaccionService.calcularSaldo(createDto.id_perfil);
-    if (saldo < item.costo_puntos) {
-      throw new BadRequestException(
-        `Saldo insuficiente: la recompensa cuesta ${item.costo_puntos} puntos y el estudiante tiene ${saldo}`,
+    const idCanje = await this.dataSource.transaction(async (manager) => {
+      // 1) Stock atómico: si otro canje se llevó la última unidad, aquí falla
+      const habiaStock = await this.catalogoService.descontarStock(
+        item.id_item,
+        manager,
       );
-    }
+      if (!habiaStock) {
+        throw new BadRequestException(
+          `La recompensa "${item.nombre}" está agotada`,
+        );
+      }
 
-    // Regla del diccionario: puntos_gastados congela el costo actual
-    const canje = this.canjeRepository.create({
-      ...createDto,
-      perfil,
-      item,
-      puntos_gastados: item.costo_puntos,
-      estado: 'Pendiente',
-      fecha_canje: new Date(),
+      // 2) Guardar el canje (puntos_gastados congela el costo actual)
+      const repo = manager.getRepository(CanjeRecompensa);
+      const canje = await repo.save(
+        repo.create({
+          ...createDto,
+          perfil,
+          item,
+          puntos_gastados: item.costo_puntos,
+          estado: 'Pendiente',
+          fecha_canje: new Date(),
+        }),
+      );
+
+      // 3) Descontar los puntos (Egreso); si no alcanzan, lanza error y se deshace todo
+      await this.transaccionService.registrar(
+        {
+          id_perfil: createDto.id_perfil,
+          tipo: 'Egreso',
+          concepto: `Canje: ${item.nombre}`.slice(0, 100),
+          puntos: item.costo_puntos,
+          origen_tipo: 'Canje',
+          origen_id: canje.id_canje,
+        },
+        manager,
+      );
+
+      return canje.id_canje;
     });
 
-    const saved = await this.canjeRepository.save(canje);
-
-    // Descontar los puntos (Egreso) y una unidad del stock
-    await this.transaccionService.registrar({
-      id_perfil: createDto.id_perfil,
-      tipo: 'Egreso',
-      concepto: `Canje: ${item.nombre}`.slice(0, 100),
-      puntos: item.costo_puntos,
-      origen_tipo: 'Canje',
-      origen_id: saved.id_canje,
-    });
-    await this.catalogoService.ajustarStock(item.id_item, -1);
-
-    return await this.findOne(saved.id_canje);
+    return await this.findOne(idCanje);
   }
 
   /**
@@ -133,36 +146,54 @@ export class CanjeRecompensaService {
 
   /**
    * Marcar un canje 'Pendiente' como Entregado o Anulado
-   * Al anular se devuelven los puntos y la unidad de stock
+   * Al anular se devuelven los puntos y la unidad de stock, todo en una transacción
    */
   async update(
     id: number,
     updateDto: UpdateCanjeRecompensaDto,
   ): Promise<CanjeRecompensa> {
-    const canje = await this.findOne(id);
+    await this.dataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(CanjeRecompensa);
 
-    if (canje.estado !== 'Pendiente') {
-      throw new BadRequestException(
-        `El canje ya está ${canje.estado} y no se puede modificar`,
-      );
-    }
-
-    canje.estado = updateDto.estado;
-    const saved = await this.canjeRepository.save(canje);
-
-    if (updateDto.estado === 'Anulado') {
-      // El libro de puntos no se borra: se registra el movimiento contrario
-      await this.transaccionService.registrar({
-        id_perfil: canje.id_perfil,
-        tipo: 'Ingreso',
-        concepto: `Anulación de canje: ${canje.item.nombre}`.slice(0, 100),
-        puntos: canje.puntos_gastados,
-        origen_tipo: 'Canje',
-        origen_id: canje.id_canje,
+      // Bloquear la fila del canje: si llegan dos anulaciones a la vez, la
+      // segunda espera y luego ve que ya no está 'Pendiente'
+      const canje = await repo.findOne({
+        where: { id_canje: id },
+        lock: { mode: 'pessimistic_write' },
       });
-      await this.catalogoService.ajustarStock(canje.id_item, 1);
-    }
 
-    return saved;
+      if (!canje) {
+        throw new NotFoundException(`Canje con ID ${id} no encontrado`);
+      }
+
+      if (canje.estado !== 'Pendiente') {
+        throw new BadRequestException(
+          `El canje ya está ${canje.estado} y no se puede modificar`,
+        );
+      }
+
+      canje.estado = updateDto.estado;
+      await repo.save(canje);
+
+      if (updateDto.estado === 'Anulado') {
+        const item = await this.catalogoService.findOne(canje.id_item);
+
+        // El libro de puntos no se borra: se registra el movimiento contrario
+        await this.transaccionService.registrar(
+          {
+            id_perfil: canje.id_perfil,
+            tipo: 'Ingreso',
+            concepto: `Anulación de canje: ${item.nombre}`.slice(0, 100),
+            puntos: canje.puntos_gastados,
+            origen_tipo: 'Canje',
+            origen_id: canje.id_canje,
+          },
+          manager,
+        );
+        await this.catalogoService.devolverStock(canje.id_item, manager);
+      }
+    });
+
+    return await this.findOne(id);
   }
 }

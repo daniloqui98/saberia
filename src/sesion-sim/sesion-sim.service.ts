@@ -6,7 +6,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, QueryFailedError, Repository } from 'typeorm';
+import {
+  EntityManager,
+  IsNull,
+  QueryFailedError,
+  Repository,
+} from 'typeorm';
 
 import { SesionSim } from './entities/sesion-sim.entity.js';
 import { CreateSesionSimDto } from './dto/create-sesion-sim.dto.js';
@@ -213,11 +218,15 @@ export class SesionSimService {
    * Guardar el puntaje total de la sesión
    * Lo llama Respuesta de simulacro cada vez que cambia una respuesta
    */
-  async actualizarPuntaje(id: number, puntaje: number): Promise<void> {
-    await this.sesionRepository.update(
-      { id_sesion: id },
-      { puntaje_total: puntaje },
-    );
+  async actualizarPuntaje(
+    id: number,
+    puntaje: number,
+    manager?: EntityManager,
+  ): Promise<void> {
+    const repo = manager
+      ? manager.getRepository(SesionSim)
+      : this.sesionRepository;
+    await repo.update({ id_sesion: id }, { puntaje_total: puntaje });
   }
 
   /**

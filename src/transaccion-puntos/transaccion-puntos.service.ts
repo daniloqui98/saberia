@@ -4,11 +4,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 
 import { TransaccionPuntos } from './entities/transaccion-puntos.entity.js';
 import { CreateTransaccionPuntosDto } from './dto/create-transaccion-puntos.dto.js';
 import { PerfilEstudianteService } from '../perfil-estudiante/perfil-estudiante.service.js';
+import { PerfilEstudiante } from '../perfil-estudiante/entities/perfil-estudiante.entity.js';
 import { SesionSimService } from '../sesion-sim/sesion-sim.service.js';
 
 @Injectable()
@@ -16,10 +17,12 @@ export class TransaccionPuntosService {
   constructor(
     @InjectRepository(TransaccionPuntos)
     private readonly transaccionRepository: Repository<TransaccionPuntos>,
-    // Servicio de Perfil para validar la FK y guardar el saldo
+    // Servicio de Perfil para validar la FK en las consultas
     private readonly perfilService: PerfilEstudianteService,
     // Servicio de Sesión para validar el origen cuando es una sesión
     private readonly sesionService: SesionSimService,
+    // Conexión para abrir transacciones
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
@@ -41,50 +44,82 @@ export class TransaccionPuntosService {
 
   /**
    * Registrar un movimiento y actualizar el saldo del estudiante
-   * También lo usan Insignia estudiante (Ingreso) y Canje de recompensa (Egreso)
+   * También lo usan Insignia estudiante (Ingreso) y Canje de recompensa (Egreso).
+   *
+   * manager: si quien llama ya abrió una transacción, el movimiento entra en
+   * ella (si algo falla después, también se deshace). Si no, abre una propia.
    */
-  async registrar(datos: CreateTransaccionPuntosDto): Promise<TransaccionPuntos> {
-    // Lanza 404 si el perfil no existe
-    const perfil = await this.perfilService.findOne(datos.id_perfil);
+  async registrar(
+    datos: CreateTransaccionPuntosDto,
+    manager?: EntityManager,
+  ): Promise<TransaccionPuntos> {
+    if (!manager) {
+      return await this.dataSource.transaction((m) => this.registrar(datos, m));
+    }
+
+    // Bloquear la fila del perfil (SELECT ... FOR UPDATE): si llegan dos
+    // movimientos del mismo estudiante a la vez, el segundo espera al primero
+    // y así nunca se gasta el mismo saldo dos veces
+    const perfil = await manager.getRepository(PerfilEstudiante).findOne({
+      where: { id_perfil: datos.id_perfil },
+      lock: { mode: 'pessimistic_write' },
+    });
+
+    if (!perfil) {
+      throw new NotFoundException(
+        `Perfil estudiante con ID ${datos.id_perfil} no encontrado`,
+      );
+    }
+
     const tipo = datos.tipo ?? 'Ingreso';
+    const saldo = await this.calcularSaldo(datos.id_perfil, manager);
 
     // Un egreso no puede dejar el saldo en negativo
-    const saldo = await this.calcularSaldo(datos.id_perfil);
     if (tipo === 'Egreso' && datos.puntos > saldo) {
       throw new BadRequestException(
         `Saldo insuficiente: el estudiante tiene ${saldo} puntos y se intentan descontar ${datos.puntos}`,
       );
     }
 
-    const transaccion = this.transaccionRepository.create({
-      ...datos,
-      tipo,
-      origen_id: datos.origen_id ?? null,
-      perfil,
-      fecha: new Date(),
-    });
-
-    const saved = await this.transaccionRepository.save(transaccion);
+    const repo = manager.getRepository(TransaccionPuntos);
+    const saved = await repo.save(
+      repo.create({
+        ...datos,
+        tipo,
+        origen_id: datos.origen_id ?? null,
+        perfil,
+        fecha: new Date(),
+      }),
+    );
 
     // (*) puntos_totales del perfil = ingresos - egresos
-    const nuevoSaldo = tipo === 'Ingreso' ? saldo + datos.puntos : saldo - datos.puntos;
-    await this.perfilService.actualizarPuntos(datos.id_perfil, nuevoSaldo);
+    const nuevoSaldo =
+      tipo === 'Ingreso' ? saldo + datos.puntos : saldo - datos.puntos;
+    await manager
+      .getRepository(PerfilEstudiante)
+      .update({ id_perfil: datos.id_perfil }, { puntos_totales: nuevoSaldo });
 
     return saved;
   }
 
   /**
-   * Saldo actual del estudiante, calculado desde sus movimientos
+   * Saldo actual del estudiante (ingresos - egresos), calculado en la base de datos
    */
-  async calcularSaldo(idPerfil: number): Promise<number> {
-    const movimientos = await this.transaccionRepository.find({
-      where: { id_perfil: idPerfil },
-    });
-
-    return movimientos.reduce(
-      (saldo, mov) => (mov.tipo === 'Ingreso' ? saldo + mov.puntos : saldo - mov.puntos),
-      0,
+  async calcularSaldo(idPerfil: number, manager?: EntityManager): Promise<number> {
+    const repo = (manager ?? this.dataSource.manager).getRepository(
+      TransaccionPuntos,
     );
+
+    const fila = await repo
+      .createQueryBuilder('t')
+      .select(
+        "COALESCE(SUM(CASE WHEN t.tipo = 'Ingreso' THEN t.puntos ELSE -t.puntos END), 0)",
+        'saldo',
+      )
+      .where('t.id_perfil = :idPerfil', { idPerfil })
+      .getRawOne<{ saldo: string | number }>();
+
+    return Number(fila?.saldo ?? 0);
   }
 
   /**

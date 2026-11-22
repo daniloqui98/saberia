@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 
 import { InsigniaEstudiante } from './entities/insignia-estudiante.entity.js';
 import { CreateInsigniaEstudianteDto } from './dto/create-insignia-estudiante.dto.js';
@@ -23,10 +23,13 @@ export class InsigniaEstudianteService {
     private readonly catalogoService: CatalogoInsigniaService,
     // Servicio de puntos para abonar (o revertir) los puntos bonus
     private readonly transaccionService: TransaccionPuntosService,
+    // Conexión para abrir transacciones
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
    * Otorgar una insignia a un estudiante y abonar sus puntos bonus
+   * (en una transacción: o quedan las dos cosas, o ninguna)
    */
   async create(
     createDto: CreateInsigniaEstudianteDto,
@@ -35,7 +38,8 @@ export class InsigniaEstudianteService {
     const perfil = await this.perfilService.findOne(createDto.id_perfil);
     const badge = await this.catalogoService.findOne(createDto.id_badge);
 
-    // Regla: cada insignia se gana una sola vez
+    // Regla: cada insignia se gana una sola vez (si dos peticiones llegan a la
+    // vez, el índice UNIQUE de la tabla detiene la segunda con un 409)
     const yaLaTiene = await this.insigniaRepository.findOne({
       where: { id_perfil: createDto.id_perfil, id_badge: createDto.id_badge },
     });
@@ -46,28 +50,36 @@ export class InsigniaEstudianteService {
       );
     }
 
-    const insignia = this.insigniaRepository.create({
-      ...createDto,
-      perfil,
-      badge,
-      fecha_obtenida: new Date(),
+    const idInsignia = await this.dataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(InsigniaEstudiante);
+      const saved = await repo.save(
+        repo.create({
+          ...createDto,
+          perfil,
+          badge,
+          fecha_obtenida: new Date(),
+        }),
+      );
+
+      // Los puntos bonus de la insignia entran como Ingreso en el libro de puntos
+      if (badge.puntos_bonus > 0) {
+        await this.transaccionService.registrar(
+          {
+            id_perfil: createDto.id_perfil,
+            tipo: 'Ingreso',
+            concepto: `Insignia: ${badge.nombre}`.slice(0, 100),
+            puntos: badge.puntos_bonus,
+            origen_tipo: 'Insignia',
+            origen_id: saved.id_insignia,
+          },
+          manager,
+        );
+      }
+
+      return saved.id_insignia;
     });
 
-    const saved = await this.insigniaRepository.save(insignia);
-
-    // Los puntos bonus de la insignia entran como Ingreso en el libro de puntos
-    if (badge.puntos_bonus > 0) {
-      await this.transaccionService.registrar({
-        id_perfil: createDto.id_perfil,
-        tipo: 'Ingreso',
-        concepto: `Insignia: ${badge.nombre}`.slice(0, 100),
-        puntos: badge.puntos_bonus,
-        origen_tipo: 'Insignia',
-        origen_id: saved.id_insignia,
-      });
-    }
-
-    return await this.findOne(saved.id_insignia);
+    return await this.findOne(idInsignia);
   }
 
   /**
@@ -112,32 +124,40 @@ export class InsigniaEstudianteService {
 
   /**
    * Revocar una insignia: se descuentan los puntos bonus que dio
+   * (en una transacción con el borrado)
    */
   async remove(id: number): Promise<void> {
     const insignia = await this.findOne(id);
     const bonus = insignia.badge.puntos_bonus;
 
-    if (bonus > 0) {
-      const saldo = await this.transaccionService.calcularSaldo(
-        insignia.id_perfil,
-      );
-      if (saldo < bonus) {
-        throw new BadRequestException(
-          `No se puede revocar: el estudiante ya gastó los ${bonus} puntos que le dio la insignia (saldo ${saldo})`,
-        );
+    await this.dataSource.transaction(async (manager) => {
+      if (bonus > 0) {
+        try {
+          // El libro de puntos no se borra: se registra el movimiento contrario
+          await this.transaccionService.registrar(
+            {
+              id_perfil: insignia.id_perfil,
+              tipo: 'Egreso',
+              concepto: `Revocación de insignia: ${insignia.badge.nombre}`.slice(0, 100),
+              puntos: bonus,
+              origen_tipo: 'Insignia',
+              origen_id: insignia.id_insignia,
+            },
+            manager,
+          );
+        } catch (error) {
+          if (error instanceof BadRequestException) {
+            throw new BadRequestException(
+              `No se puede revocar: el estudiante ya gastó los ${bonus} puntos que le dio la insignia`,
+            );
+          }
+          throw error;
+        }
       }
 
-      // El libro de puntos no se borra: se registra el movimiento contrario
-      await this.transaccionService.registrar({
-        id_perfil: insignia.id_perfil,
-        tipo: 'Egreso',
-        concepto: `Revocación de insignia: ${insignia.badge.nombre}`.slice(0, 100),
-        puntos: bonus,
-        origen_tipo: 'Insignia',
-        origen_id: insignia.id_insignia,
+      await manager.getRepository(InsigniaEstudiante).delete({
+        id_insignia: insignia.id_insignia,
       });
-    }
-
-    await this.insigniaRepository.remove(insignia);
+    });
   }
 }

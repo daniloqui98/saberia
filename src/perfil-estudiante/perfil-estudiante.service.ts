@@ -72,17 +72,6 @@ export class PerfilEstudianteService {
   }
 
   /**
-   * (*) Guardar el saldo de puntos (atributo derivado)
-   * Lo llama Transacción de puntos cada vez que hay un movimiento
-   */
-  async actualizarPuntos(idPerfil: number, total: number): Promise<void> {
-    await this.perfilRepository.update(
-      { id_perfil: idPerfil },
-      { puntos_totales: total },
-    );
-  }
-
-  /**
    * Cantidad de estudiantes matriculados en un grupo (la usa Reporte de grupo)
    */
   async contarPorGrupo(idGrupo: number): Promise<number> {

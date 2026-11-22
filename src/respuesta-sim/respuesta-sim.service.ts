@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 
 import { RespuestaSim } from './entities/respuesta-sim.entity.js';
 import { CreateRespuestaSimDto } from './dto/create-respuesta-sim.dto.js';
@@ -26,6 +26,8 @@ export class RespuestaSimService {
     private readonly sesionService: SesionSimService,
     private readonly simPreguntaService: SimPreguntaService,
     private readonly opcionService: OpcionService,
+    // Conexión para abrir transacciones
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
@@ -81,10 +83,9 @@ export class RespuestaSimService {
       fecha_respuesta: new Date(),
     });
 
-    const saved = await this.respuestaRepository.save(respuesta);
-    await this.recalcularPuntaje(sesion.id_sesion);
-
-    return saved;
+    return (await this.guardarYRecalcular(sesion.id_sesion, (manager) =>
+      manager.getRepository(RespuestaSim).save(respuesta),
+    )) as RespuestaSim;
   }
 
   /**
@@ -157,10 +158,9 @@ export class RespuestaSimService {
       respuesta.fecha_respuesta = new Date();
     }
 
-    const saved = await this.respuestaRepository.save(respuesta);
-    await this.recalcularPuntaje(respuesta.id_sesion);
-
-    return saved;
+    return (await this.guardarYRecalcular(respuesta.id_sesion, (manager) =>
+      manager.getRepository(RespuestaSim).save(respuesta),
+    )) as RespuestaSim;
   }
 
   /**
@@ -168,10 +168,10 @@ export class RespuestaSimService {
    */
   async remove(id: number): Promise<void> {
     const respuesta = await this.findOne(id);
-    const idSesion = respuesta.id_sesion;
 
-    await this.respuestaRepository.remove(respuesta);
-    await this.recalcularPuntaje(idSesion);
+    await this.guardarYRecalcular(respuesta.id_sesion, async (manager) => {
+      await manager.getRepository(RespuestaSim).remove(respuesta);
+    });
   }
 
   /**
@@ -220,10 +220,35 @@ export class RespuestaSimService {
   }
 
   /**
+   * Guardar o borrar la respuesta y recalcular el puntaje en UNA transacción:
+   * así la respuesta y el puntaje_total de la sesión nunca quedan desfasados
+   */
+  private async guardarYRecalcular(
+    idSesion: number,
+    accion: (manager: EntityManager) => Promise<RespuestaSim | void>,
+  ): Promise<RespuestaSim | void> {
+    return await this.dataSource.transaction(async (manager) => {
+      // Bloquear la fila de la sesión: si llegan dos respuestas de la misma
+      // sesión a la vez, la segunda espera y recalcula con la primera ya guardada
+      await manager.getRepository(SesionSim).findOne({
+        where: { id_sesion: idSesion },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      const resultado = await accion(manager);
+      await this.recalcularPuntaje(idSesion, manager);
+      return resultado;
+    });
+  }
+
+  /**
    * puntaje_total de la sesión = suma de los puntajes de las preguntas acertadas
    */
-  private async recalcularPuntaje(idSesion: number): Promise<void> {
-    const respuestas = await this.respuestaRepository.find({
+  private async recalcularPuntaje(
+    idSesion: number,
+    manager: EntityManager,
+  ): Promise<void> {
+    const respuestas = await manager.getRepository(RespuestaSim).find({
       where: { id_sesion: idSesion, es_correcta: true },
       relations: { simPregunta: true },
     });
@@ -236,6 +261,7 @@ export class RespuestaSimService {
     await this.sesionService.actualizarPuntaje(
       idSesion,
       Math.round(puntaje * 100) / 100,
+      manager,
     );
   }
 }

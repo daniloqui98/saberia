@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { QueryFailedError, Repository } from 'typeorm';
+import { EntityManager, QueryFailedError, Repository } from 'typeorm';
 
 import { CatalogoRecompensa } from './entities/catalogo-recompensa.entity.js';
 import { CreateCatalogoRecompensaDto } from './dto/create-catalogo-recompensa.dto.js';
@@ -66,14 +66,30 @@ export class CatalogoRecompensaService {
   }
 
   /**
-   * Sumar o restar unidades al stock (lo usa Canje de recompensa)
-   * cantidad = -1 al canjear, +1 al anular un canje
+   * Descontar una unidad de stock en UNA sola consulta atómica:
+   * UPDATE ... SET stock = stock - 1 WHERE id_item = ? AND stock > 0
+   * Si dos canjes llegan a la vez por la última unidad, solo uno la obtiene.
+   * Devuelve false si ya no había stock. Lo usa Canje de recompensa
    */
-  async ajustarStock(id: number, cantidad: number): Promise<void> {
-    await this.recompensaRepository.increment(
+  async descontarStock(id: number, manager: EntityManager): Promise<boolean> {
+    const resultado = await manager
+      .createQueryBuilder()
+      .update(CatalogoRecompensa)
+      .set({ stock: () => 'stock - 1' })
+      .where('id_item = :id AND stock > 0', { id })
+      .execute();
+
+    return (resultado.affected ?? 0) > 0;
+  }
+
+  /**
+   * Devolver una unidad de stock (al anular un canje)
+   */
+  async devolverStock(id: number, manager: EntityManager): Promise<void> {
+    await manager.getRepository(CatalogoRecompensa).increment(
       { id_item: id },
       'stock',
-      cantidad,
+      1,
     );
   }
 

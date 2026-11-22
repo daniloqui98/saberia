@@ -5,9 +5,15 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { QueryFailedError, Repository } from 'typeorm';
+import {
+  DataSource,
+  EntityManager,
+  QueryFailedError,
+  Repository,
+} from 'typeorm';
 
 import { SimPregunta } from './entities/sim-pregunta.entity.js';
+import { Simulacro } from '../simulacro/entities/simulacro.entity.js';
 import { CreateSimPreguntaDto } from './dto/create-sim-pregunta.dto.js';
 import { UpdateSimPreguntaDto } from './dto/update-sim-pregunta.dto.js';
 import { SimulacroService } from '../simulacro/simulacro.service.js';
@@ -21,6 +27,8 @@ export class SimPreguntaService {
     // Servicios de Simulacro y Pregunta para validar que las llaves foráneas existan
     private readonly simulacroService: SimulacroService,
     private readonly preguntaService: PreguntaService,
+    // Conexión para abrir transacciones
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
@@ -59,22 +67,19 @@ export class SimPreguntaService {
       throw new ConflictException('La pregunta ya está en este simulacro');
     }
 
-    // Si no se envía el orden, la pregunta va al final
-    const orden =
-      createDto.orden ?? (await this.siguienteOrden(createDto.id_simulacro));
-    await this.validarOrdenLibre(createDto.id_simulacro, orden);
+    // Calcular la posición, guardar y recalcular el total en UNA transacción
+    return await this.enTransaccion(createDto.id_simulacro, async (manager) => {
+      // Si no se envía el orden, la pregunta va al final
+      const orden =
+        createDto.orden ??
+        (await this.siguienteOrden(createDto.id_simulacro, manager));
+      await this.validarOrdenLibre(createDto.id_simulacro, orden, manager);
 
-    const simPregunta = this.simPreguntaRepository.create({
-      ...createDto,
-      orden,
-      simulacro,
-      pregunta,
+      const repo = manager.getRepository(SimPregunta);
+      return await repo.save(
+        repo.create({ ...createDto, orden, simulacro, pregunta }),
+      );
     });
-
-    const saved = await this.simPreguntaRepository.save(simPregunta);
-    await this.recalcularTotal(createDto.id_simulacro);
-
-    return saved;
   }
 
   /**
@@ -159,10 +164,11 @@ export class SimPreguntaService {
    */
   async remove(id: number): Promise<void> {
     const simPregunta = await this.findOne(id);
-    const idSimulacro = simPregunta.id_simulacro;
 
     try {
-      await this.simPreguntaRepository.remove(simPregunta);
+      await this.enTransaccion(simPregunta.id_simulacro, async (manager) => {
+        await manager.getRepository(SimPregunta).remove(simPregunta);
+      });
     } catch (error) {
       // 1451 = ER_ROW_IS_REFERENCED_2: hay respuestas de estudiantes a esta pregunta
       if (error instanceof QueryFailedError && error.driverError?.errno === 1451) {
@@ -172,8 +178,27 @@ export class SimPreguntaService {
       }
       throw error;
     }
+  }
 
-    await this.recalcularTotal(idSimulacro);
+  /**
+   * Ejecutar un cambio y recalcular total_preguntas en UNA transacción,
+   * bloqueando la fila del simulacro para que dos cambios simultáneos al
+   * mismo simulacro se hagan uno detrás del otro
+   */
+  private async enTransaccion<T>(
+    idSimulacro: number,
+    accion: (manager: EntityManager) => Promise<T>,
+  ): Promise<T> {
+    return await this.dataSource.transaction(async (manager) => {
+      await manager.getRepository(Simulacro).findOne({
+        where: { id_simulacro: idSimulacro },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      const resultado = await accion(manager);
+      await this.recalcularTotal(idSimulacro, manager);
+      return resultado;
+    });
   }
 
   /**
@@ -182,8 +207,12 @@ export class SimPreguntaService {
   private async validarOrdenLibre(
     idSimulacro: number,
     orden: number,
+    manager?: EntityManager,
   ): Promise<void> {
-    const ocupada = await this.simPreguntaRepository.findOne({
+    const repo = manager
+      ? manager.getRepository(SimPregunta)
+      : this.simPreguntaRepository;
+    const ocupada = await repo.findOne({
       where: { id_simulacro: idSimulacro, orden },
     });
 
@@ -197,8 +226,11 @@ export class SimPreguntaService {
   /**
    * Siguiente posición libre al final del simulacro
    */
-  private async siguienteOrden(idSimulacro: number): Promise<number> {
-    const ultimo = await this.simPreguntaRepository.findOne({
+  private async siguienteOrden(
+    idSimulacro: number,
+    manager: EntityManager,
+  ): Promise<number> {
+    const ultimo = await manager.getRepository(SimPregunta).findOne({
       where: { id_simulacro: idSimulacro },
       order: { orden: 'DESC' },
     });
@@ -209,11 +241,18 @@ export class SimPreguntaService {
   /**
    * (*) Recalcular total_preguntas del simulacro (atributo derivado)
    */
-  private async recalcularTotal(idSimulacro: number): Promise<void> {
-    const total = await this.simPreguntaRepository.count({
+  private async recalcularTotal(
+    idSimulacro: number,
+    manager: EntityManager,
+  ): Promise<void> {
+    const total = await manager.getRepository(SimPregunta).count({
       where: { id_simulacro: idSimulacro },
     });
 
-    await this.simulacroService.actualizarTotalPreguntas(idSimulacro, total);
+    await this.simulacroService.actualizarTotalPreguntas(
+      idSimulacro,
+      total,
+      manager,
+    );
   }
 }

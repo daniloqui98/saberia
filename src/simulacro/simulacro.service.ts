@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { QueryFailedError, Repository } from 'typeorm';
+import { EntityManager, QueryFailedError, Repository } from 'typeorm';
 
 import { Simulacro } from './entities/simulacro.entity.js';
 import { CreateSimulacroDto } from './dto/create-simulacro.dto.js';
@@ -114,11 +114,15 @@ export class SimulacroService {
    * (*) Guardar el total de preguntas (atributo derivado)
    * Lo llama Sim_Pregunta cada vez que se agrega o quita una pregunta
    */
-  async actualizarTotalPreguntas(id: number, total: number): Promise<void> {
-    await this.simulacroRepository.update(
-      { id_simulacro: id },
-      { total_preguntas: total },
-    );
+  async actualizarTotalPreguntas(
+    id: number,
+    total: number,
+    manager?: EntityManager,
+  ): Promise<void> {
+    const repo = manager
+      ? manager.getRepository(Simulacro)
+      : this.simulacroRepository;
+    await repo.update({ id_simulacro: id }, { total_preguntas: total });
   }
 
   /**
